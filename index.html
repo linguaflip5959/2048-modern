@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>2048 · Modern Minimal</title>
+<meta name="theme-color" content="#F1FAF5">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23C79BE8'/%3E%3Cstop offset='1' stop-color='%23FBB02D'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='41' font-family='Arial,Helvetica,sans-serif' font-size='22' font-weight='800' fill='%23fff' text-anchor='middle'%3E2048%3C/text%3E%3C/svg%3E"><!-- [ревизия 6.2] favicon: inline SVG, без файла -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/space-grotesk/index.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/manrope/index.css">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/style.css">
+<!--
+════════════════════════════════════════════════════════════════════════════
+ РЕВИЗИЯ 8 · аудит + аналитика + реальные рекламные блоки (по запросу)
+════════════════════════════════════════════════════════════════════════════
+ • АУДИТ (логика/управление/сохранения/адаптивность): всё зелёное,
+   кроме двух подтверждённых дефектов:
+   [F9] «Перемешать» не блокировало ввод на свои 340 мс анимации —
+        ход в этом окне давал рассинхрон: сетка уже новая, а доехавший
+        твин перемешивания перетаскивал плитки в старые позиции
+        (застревали смещёнными на клетку, 168 px — воспроизведено
+        тестом). doShuffle теперь ставит busy на окно анимации
+        (js/scene.js).
+   [F10] VK rewarded: формат называется 'reward' (документация VK
+        Bridge), а код посылал несуществующее 'rewarded' — вызов
+        отклонялся, награда не выдавалась. Исправлено в js/platform.js.
+ • АНАЛИТИКА: js/analytics.js (Game Analytics Standard v1.0 из
+   Судоку-дзен, приспособлен для 2048): сессии, очередь в localStorage,
+   тех-ошибки, отправка в Яндекс.Метрику (METRIKA_ID — сейчас общий
+   с Судоку-дзен счётчик 114011711, замените на свой) или на свой
+   ENDPOINT; на file:// счётчик не грузится — очередь копится локально.
+   init — по первому действию игрока (main.js). События 2048:
+   level_start/game_restart/game_win/game_fail/game_continue/
+   undo_used/shuffle_used/revive_used/ui_settings/ad_* (см. шапку
+   модуля). Отладка: ?za-debug, ZA.state(), ZA.dump().
+ • РЕАЛЬНЫЕ РЕКЛАМНЫЕ БЛОКИ для публикации:
+   - INTERSTITIAL [новое]: Яндекс showFullscreenAdv / VK
+     VKWebAppShowNativeAds(ad_format:'interstitial') — показывается
+     перед новой партией («Заново», «Новая игра» после проигрыша),
+     только на площадках, не чаще раза в 60 с (сверху частоту
+     контролирует площадка). Вне площадок — без рекламы.
+   - REWARDED: как было (Яндекс showRewardedVideo / VK
+     VKWebAppShowNativeAds(ad_format:'reward') после [F10]) + демо-плеер
+     вне площадок для Undo/Shuffle/Revive.
+   - GameplayAPI (Яндекс, обязателен к публикации): start при игре,
+     stop на паузах/поражении/рекламе/сворачивании — синхронизируется
+     из hud.syncControls() и обёрток рекламы (js/platform.js).
+════════════════════════════════════════════════════════════════════════════
+ РЕВИЗИЯ 6 · темп фона + шапка в 3 строки (по запросу)
+════════════════════════════════════════════════════════════════════════════
+ • [F7] ЧАСТИЦЫ: при нормализации координат фона в 0..1 (ревизия 5)
+   скорость пыли умножалась на h/L вместо деления на L — пыль летела
+   в h раз быстрее задуманного (экран пересекался за ~0.06 с и выгля-
+   дела мерцанием). Темп оригинала восстановлен: 5–18 px/с в масштабе
+   поля, полный экран — за 42–152 с (js/scene.js, update()).
+ • ШАПКА — 3 строки, все по центру: лого «2048» (25px от верха,
+   safe-area учитывается), ниже — меню «Темы/Язык/Звук», ещё ниже —
+   «Счёт/Рекорд» между меню и игровым полем. Отступ 50px (--native-
+   gap) упразднён: меню во 2-й строке и так ниже нативных кнопок
+   ВК/Яндекс в верхних углах, а лого по центру их не задевает.
+ • SDK ТОЛЬКО НА ПЛОЩАДКЕ: вне iframe Яндекс Игр / мини-приложения VK
+   SDK больше не загружаются вовсе — раньше sdk.js качался на любом
+   http-хостинге и печатал «SDK initialization outside of frame»
+   (js/platform.js: VK — по vk_app_id в URL, Яндекс — self!==top).
+════════════════════════════════════════════════════════════════════════════
+ РЕВИЗИЯ 5 · платформа + фон + HUD (по запросу)
+════════════════════════════════════════════════════════════════════════════
+ • ФОН АНИМИРОВАННЫЙ: анимация (орбы/пыль), стоявшая под игровым полем,
+   развёрнута на весь экран. Канвас Phaser растянут на вьюпорт
+   (Scale.RESIZE, контейнер #stage-bg внутри .bg), амбиент нормализован
+   (0..1); поле центрируется и масштабируется по фактической геометрии
+   DOM-спейсера #stage — scene.layout() + resize/ResizeObserver.
+ • ЛОГО: шрифт зафиксирован — Kabyta Italicexpanded.otf (папка fonts/,
+   css/fonts.css). Превью-переключатель 17 шрифтов и подпись имени
+   шрифта (#font-tag) удалены. Кегль ×3 (clamp 30–90px), слева.
+ • HUD: «Счёт/Рекорд» центрированы (grid 1fr·auto·1fr); тэглайн
+   «Соединяйте плитки…» перенесён под игровое поле; блок «Темы/Язык/
+   Звук» отступ сверху 50px (--native-gap) — под нативные кнопки ВК
+   и Яндекс.
+ • ОТМЕНА: 3 бесплатные отмены за партию (бейдж «3/2/1»), далее —
+   неограниченно через rewarded-рекламу. «Заново» восстанавливает 3.
+ • SDK ПЛАТФОРМ: js/platform.js — VK Bridge (VKWebAppInit,
+   VKWebAppShowNativeAds rewarded) и SDK Яндекс Игр (YaGames.init,
+   LoadingAPI.ready, showRewardedVideo). Оба грузятся динамически и
+   безопасно: file:// / обычный хостинг → демо-плеер ads.js как раньше.
+   js/ads.js НЕ изменён — используется штатная точка window.REWARDED_ADS.
+════════════════════════════════════════════════════════════════════════════
+ РЕВИЗИЯ 3 · аудит без новых функций (только подтверждённые дефекты)
+════════════════════════════════════════════════════════════════════════════
+ ИГРОВАЯ ЛОГИКА / ОТМЕНА ХОДА
+ [F1] КРИТИЧНО: снапшот истории писался ПОСЛЕ compute(), а compute()
+      мутирует поле на месте. Отмена хода восстанавливала искажённое
+      промежуточное состояние: слияние 2+2->4 после отмены превращалось
+      в ОДНУ плитку «2» (плитки терялись), чистые сдвиги не отменялись,
+      отменялись только спавн и очки. Снапшот берётся ДО compute().
+ [F2] restore() не восстанавливал флаг won: победа -> «Играть дальше» ->
+      отмена -> повторная сборка 2048 больше не показывала экран победы
+      и звук. Снапшот теперь хранит won, restore() возвращает его.
+ [F3] После «Продолжить за рекламу» (doRevive) окно 300 мс до спавна
+      оставалось открытым для ввода: ход в этом окне порождал ДВЕ новые
+      плитки (спавн хода + отложенный спавн revive). На окно наложен
+      busy — как у обычного хода.
+ [F4] Phaser 3.80 killAll() НЕ вызывает onComplete (проверено тестом):
+      «Заново» или отмена посреди тряски от неверного хода оставляли
+      игровое поле смещённым до 7 px до следующей тряски. hardStop()
+      теперь возвращает board.x на место.
+
+ Не подтверждено / не менялось: механика рекламы, темы, звук, i18n,
+ адаптивность (E1–E4 из ревизии 1), превью шрифтов заголовка.
+ Отсутствие автосохранения партии — осознанное поведение заготовки,
+ не дефект (добавление было бы новой функцией).
+════════════════════════════════════════════════════════════════════════════
+ РЕВИЗИЯ 2 · «доведём до ума»
+════════════════════════════════════════════════════════════════════════════
+ • УДАЛЕНО: кнопка и функция «Размер текста» (btn-text, --fs, SCALES/scaleIdx,
+   applyScale, rescaleTiles) — размер текста фиксированный.
+ • УДАЛЕНО: кнопка и функция «Анимации» (btn-motion, motionOn, applyMotion,
+   D(), body.motion-off). Системное prefers-reduced-motion сохранено —
+   это доступность ОС, а не игровая настройка.
+ • ДОБАВЛЕНО (ВРЕМЕННО): превью шрифтов заголовка «2048». Клик (или Enter)
+   по заголовку листает 17 шрифтов из папки fonts/ циклично; под заголовком
+   — подпись #font-tag с именем текущего файла и меткой «файл не найден»,
+   если fonts/XXX отсутствует. Выбор запоминается (localStorage g2048_logoFont).
+   Как только шрифт выбран: удалить js/logo-fonts.js, css/fonts.css, папку
+   fonts/, строку <script logo-fonts> и блок «LOGO FONT PREVIEW» в style.css.
+ • Реклама: НЕ ТРОНУТА — js/ads.js дословно переносит прежнюю логику
+   showRewardedAd()/closeAd() (ревизия аудита A1–A3).
+ • Файл разделён на составляющие: index.html + css/{style,fonts}.css +
+   js/{util,storage,i18n,state,themes,audio,logo-fonts,ads,hud,scene,main}.js
+   Обычные <script src> — работает с диска по file:// без сервера.
+════════════════════════════════════════════════════════════════════════════
+ АУДИТ (ревизия 1). Найденные и исправленные дефекты:
+════════════════════════════════════════════════════════════════════════════
+ REWARD ADS
+ [A1] КРИТИЧНО: в endAd() обращение к несуществующей переменной onReward
+      -> ReferenceError при клике «Забрать награду»: награда не выдавалась,
+      endAd.cb не очищался, в консоль падала ошибка.
+ [A2] КРИТИЧНО: rewardAd() ставил endAd.cb=cb, а затем обёртка
+      showRewardedAd перезаписывала его пустой функцией ()=>{} — даже без
+      ошибки A1 колбэк награды терялся. Модуль рекламы переписан целиком.
+ [A3] Escape закрывал ролик в обход disabled-состояния (во время отсчёта).
+
+ ИГРОВАЯ ЛОГИКА
+ [B1] КРИТИЧНО: «Заново» во время анимации хода — отложенный finish(plan)
+      срабатывал по уже уничтоженным плиткам (исключение) и дописывал очки/
+      плитки в новую игру. Введены runId-токен, tweens.killAll(),
+      time.removeAllEvents() и очистка fxLayer.
+ [B2] Отмена хода после «Перемешать» ничего не отменяла: снапшот истории
+      записывался ПОСЛЕ изменения поля. Теперь пишется до.
+ [B3] Победа на последнем возможном ходу: карточка «Победа» через 420 мс
+      перезаписывалась карточкой «Игра окончена» (двойной звук win+lose).
+ [B4] «Играть дальше» при over=true оставлял мёртвое поле без возможности
+      продолжить — теперь корректно переходит к экрану поражения.
+ [B5] Перекрывающиеся counter-твины счёта: число откатывалось/мигало,
+      shownScore сбрасывался синхронно со стартом твина.
+ [B6] Перезапуск во время shake-анимации накладывал твины друг на друга.
+ [B7] Все duration:0 заменены на 1 мс — нулевая длительность твина в
+      Phaser даёт деление на 0 и незавершённый твин: новая плитка могла
+      навсегда остаться с scale=0 (невидимой). (В ревизии 2 «режим меньше
+      движения» удалён — длительности фиксированные и не нулевые.)
+
+ УПРАВЛЕНИЕ
+ [C1] Клавиатура и свайпы работали, пока открыты модалки (реклама, победа):
+      стрелки двигали поле за оверлеем. Добавлен общий guard uiBlocked().
+ [C2] Клик по кнопкам HUD в первые ~2 c (до загрузки шрифтов и создания
+      сцены) давал TypeError: SCENE === null. Добавлены guards.
+ [C3] WASD привязан к e.code — раскладка (RU/EN) больше не влияет.
+
+ СОХРАНЕНИЯ
+ [D1] Рекорд (best) не выводился при загрузке страницы — в #best стояло «0».
+ [D2] scaleIdx: clamp() вызывался ДО проверки indexOf() → любое повреждённое
+      значение localStorage молча давало размер «S» вместо «M». (Настройка
+      удалена в ревизии 2, валидация остальных ключей сохранена.)
+ [D3] Валидация типов сохранённых best/sound/tscale/theme/tscale.
+
+ АДАПТИВНОСТЬ
+ [E1] iOS: .ui на inset:0 растягивался на large viewport — нижняя панель
+      уходила под тулбар. Добавлено height:100dvh (фолбэк на inset:0).
+ [E2] Канвас не пересчитывался при изменении размеров HUD — поле выходило
+      за границы/появлялся зазор. Добавлен ResizeObserver -> game.scale.refresh().
+ [E3] В диапазоне 430–620px у кнопок действовал gap:0 при видимой подписи —
+      иконка слипалась с текстом; AD-бейдж позиционировался абсолютно на
+      всех мобильных ширинах. Правила разнесены по брейкпоинтам.
+ [E4] Узкие экраны (<=430px) и низкие (<=520px): HUD занимал до 3 строк и
+      съедал место поля — уменьшены кнопки/пиллы/отступы, tools прижаты
+      вправо при переносе.
+ [E5] Удалён мёртвый код: пустой window.resize-обработчик и no-op forEach
+      в applyTheme().
+════════════════════════════════════════════════════════════════════════════
+-->
+</head>
+<body>
+
+<div class="bg" aria-hidden="true">
+  <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+  <div id="stage-bg"></div><!-- канвас Phaser на весь экран (орбы/пыль/поле) -->
+  <div class="grain"></div><div class="vign"></div>
+</div>
+
+<div class="ui">
+  <header class="hud-top">
+    <!-- [ревизия 6] 3 строки по центру: лого → меню → счёт -->
+    <div class="brand">
+      <div class="logo">2048</div>
+    </div>
+
+    <div class="tools">
+      <button class="ibtn" id="btn-theme" aria-label="Theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.6"/><path d="M12 3.4a8.6 8.6 0 0 0 0 17.2z" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button class="ibtn" id="btn-lang" aria-label="Language">RU</button>
+      <button class="ibtn" id="btn-sound" aria-label="Sound">
+        <svg class="i-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.2L12 5.4v13.2L7.2 14.5H4z"/><path d="M15.6 9.2a4 4 0 0 1 0 5.6M18.2 6.6a7.6 7.6 0 0 1 0 10.8"/></svg>
+        <svg class="i-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="display:none"><path d="M4 9.5h3.2L12 5.4v13.2L7.2 14.5H4z"/><path d="M16.2 9.8l4.2 4.4M20.4 9.8l-4.2 4.4"/></svg>
+      </button>
+    </div>
+
+    <div class="scores">
+      <div class="pill" id="pill-score">
+        <span class="pill-label" data-i18n="score">Счёт</span>
+        <span class="pill-value" id="score">0</span>
+      </div>
+      <div class="pill">
+        <span class="pill-label" data-i18n="best">Рекорд</span>
+        <span class="pill-value" id="best">0</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="stage"></main>
+  <div class="tagline" data-i18n="tagline">Соединяйте плитки и достигните 2048</div>
+
+  <footer class="hud-bottom">
+    <button class="action" id="btn-undo" title="">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h9.5a5.5 5.5 0 0 1 0 11H8"/><path d="M7.6 5.2L3.8 9l3.8 3.8"/></svg>
+      <span class="lbl" data-i18n="undo">Отменить</span><span class="ad-badge">AD</span>
+    </button>
+    <button class="action" id="btn-shuffle" title="">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3.6l3 4.4M21 7h-4.2l-7.4 10H3"/><path d="M18.4 4.4L21 7l-2.6 2.6M18.4 14.4L21 17l-2.6 2.6"/><path d="M14.6 12.2L16 14.2"/></svg>
+      <span class="lbl" data-i18n="shuffle">Перемешать</span><span class="ad-badge">AD</span>
+    </button>
+    <button class="action primary" id="btn-new" title="">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20.4 4v4.4H16"/></svg>
+      <span class="lbl" data-i18n="new">Заново</span>
+    </button>
+  </footer>
+  <div class="hintbar" data-i18n="hint">Свайп или стрелки ← ↑ → ↓</div>
+</div>
+
+<!-- END / WIN OVERLAY -->
+<div class="overlay" id="ov-end" role="dialog" aria-modal="true">
+  <div class="card">
+    <div class="end-badge" id="end-badge">2048</div>
+    <h2 id="end-title">Игра окончена</h2>
+    <p id="end-sub">Свободных клеток не осталось</p>
+    <div class="end-scores">
+      <div><span data-i18n="score">Счёт</span><b id="end-score">0</b></div>
+      <div><span data-i18n="best">Рекорд</span><b id="end-best">0</b></div>
+    </div>
+    <button class="btn cta" id="end-ad">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6L19 12z"/></svg>
+      <span data-i18n="continueAd">Продолжить за рекламу</span><span class="ad-badge">AD</span>
+    </button>
+    <button class="btn" id="end-keep" style="display:none" data-i18n="keepGoing">Играть дальше</button>
+    <button class="btn" id="end-new" data-i18n="playAgain">Новая игра</button>
+  </div>
+</div>
+
+<!-- REWARDED AD OVERLAY -->
+<div class="overlay" id="ov-ad" role="dialog" aria-modal="true">
+  <div class="ad-card">
+    <div class="ad-head"><span class="rec"></span><span data-i18n="adSponsor">Реклама · демо-плеер</span><span class="tm" id="ad-timer">5</span></div>
+    <div class="ad-video"><div class="ad-mark"><b>AD</b><i data-i18n="adRewardIn" id="ad-caption">Награда через 5 с</i></div></div>
+    <div class="ad-bar"><i id="ad-bar"></i></div>
+    <div class="ad-body">
+      <p class="ad-note" data-i18n="adNote">Это заглушка rewarded-ролика. Подключите AdMob / Unity Ads / AppLovin в функции <b>showRewardedAd()</b>.</p>
+      <div class="ad-actions">
+        <button class="btn" id="ad-close" disabled data-i18n="adClose">Закрыть</button>
+        <button class="btn cta" id="ad-claim" disabled data-i18n="adClaim">Забрать награду</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/analytics.js"></script><!-- [ревизия 8] ядро аналитики (ZA) -->
+<script src="js/i18n.js"></script>
+<script src="js/state.js"></script>
+<script src="js/themes.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/ads.js"></script>
+<script src="js/platform.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
