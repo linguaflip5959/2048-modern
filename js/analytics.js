@@ -22,8 +22,7 @@
 
    Транспорты:
    - Яндекс.Метрика: METRIKA_ID (ниже) — скрипт счётчика загружается сам.
-     ВНИМАНИЕ: 114011711 — счётчик Судоку-дзен; для раздельной статистики
-     2048 заведите в Метрике свой ID и впишите его сюда. На file:// счётчик
+     114075082 — отдельный счётчик 2048-modern. На file:// счётчик
      НЕ грузится (локальные прогоны не мусорят статистику) — события
      копятся в локальной очереди.
    - свой коллектор: впишите ENDPOINT (POST JSON: {env, events[]})
@@ -47,8 +46,8 @@ window.ZA=(function(){
   const CFG={
     GAME:'2048-modern',       /* название игры */
     VER:'8',                  /* версия игры (ревизия) */
-    METRIKA_ID:114011711,     /* ← ID счётчика Яндекс.Метрики (число) или null.
-                                 Сейчас общий с Судоку-дзен — замените на свой */
+    METRIKA_ID:114075082,     /* ← ID счётчика Яндекс.Метрики (число) или null.
+                                 Отдельный счётчик 2048-modern (не общий с Судоку-дзен) */
     ENDPOINT:null,            /* ← URL своего коллектора (POST JSON) или null */
     QUEUE_KEY:'g2048_za_queue',
     UID_KEY:'g2048_za_uid',
@@ -204,8 +203,11 @@ window.ZA=(function(){
       /* заглушка-очередь: вызовы до загрузки скрипта проиграются потом */
       window.ym=window.ym||function(){ (window.ym.a=window.ym.a||[]).push(arguments); };
       window.ym.l=1*new Date();
+      /* параметры — как в официальном сниппете счётчика 114075082 */
       window.ym(CFG.METRIKA_ID,'init',
-        { clickmap:false, tracklinks:true, accurateTrackBounce:false, webvisor:false });
+        { ssr:true, clickmap:true, ecommerce:'dataLayer',
+          referrer:document.referrer, url:location.href,
+          accurateTrackBounce:true, trackLinks:true });
       const s=document.createElement('script');
       s.async=true;
       s.src='https://mc.yandex.ru/metrika/tag.js';
